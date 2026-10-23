@@ -42,27 +42,75 @@ CLAUDE_MANAGED_ENVIRONMENT_ID=your_environment_id
 PORT=3030
 ```
 
-## How the application was developed
+## How the app was build
 
-The browser collects inputs; the Node host validates requests; the lesson implementation produces observable evidence. The architecture page walks through the real source with numbered steps, prerequisite configuration, source filenames and code excerpts.
+### 1. Require a canonical reviewed skill version
 
-### Lesson implementation
+A version must have the canonical prefix and match the resolved value. A moving alias cannot stand in for the configuration the host reviewed.
 
-[src/lesson.ts](https://github.com/luiscoco/Udemy-claude-managed-agents-lesson-c30-app/blob/main/src/lesson.ts)
+Source: [src/lesson.ts](src/lesson.ts#L13) · selected statements
 
 ```typescript
-  async run(input) {
+const version = text(input, "version"),
+  resolved = text(input, "resolvedVersion");
 
-const version=text(input,"version"),resolved=text(input,"resolvedVersion");
-if(!version.startsWith("skver_")||version!==resolved)return report("rejected","Expected a matching canonical skill version",{},["Reject a moving alias for the reviewed configuration"]);
-const bundle={"SKILL.md":"Format field observations using the approved report template.","references/template.txt":"Habitat: ...\nObservation: ..."};
-return report("passed","Separated authored, configured, and observed skill evidence",{version,manifest:Object.entries(bundle).map(([path,bytes])=>({path,sha256:hash(bytes)})),observedRead:flag(input,"readInstructions"),permissionsGrantedBySkill:false},["Hash authored files","Match the resolved canonical version","Keep a configured skill distinct from observed file reads"]);
-
-  }
-};
+if (!version.startsWith("skver_") || version !== resolved)
+  return report("rejected", "Expected a matching canonical skill version", {}, [
+    "Reject a moving alias for the reviewed configuration",
+  ]);
 ```
 
-Read the architecture page for the remaining source excerpts and explanations, including input handling and optional provider behavior. The diagram describes this application, rather than implying that an external integration has been implemented.
+### 2. Hash authored files and distinguish observation
+
+The manifest hashes SKILL.md and its reference bytes. observedRead is separate supplied evidence, and permissionsGrantedBySkill stays false: packaging instructions does not grant tool authority.
+
+Source: [src/lesson.ts](src/lesson.ts#L15) · selected statements
+
+```typescript
+const bundle = {
+  "SKILL.md": "Format field observations using the approved report template.",
+  "references/template.txt": "Habitat: ...\nObservation: ...",
+};
+
+return report(
+  "passed",
+  "Separated authored, configured, and observed skill evidence",
+  {
+    version,
+    manifest: Object.entries(bundle).map(([path, bytes]) => ({
+      path,
+      sha256: hash(bytes),
+    })),
+    observedRead: flag(input, "readInstructions"),
+    permissionsGrantedBySkill: false,
+  },
+  [
+    "Hash authored files",
+    "Match the resolved canonical version",
+    "Keep a configured skill distinct from observed file reads",
+  ],
+);
+```
+
+### Check your understanding
+
+Run **Verify pinned instructions and reads** in the application. Compare the result with these scenario expectations:
+
+```json
+{
+  "input": {
+    "version": "skver_demo1",
+    "resolvedVersion": "skver_demo1",
+    "readInstructions": true
+  },
+  "expectedOutcome": "passed",
+  "checkEvidence": {
+    "observedRead": true
+  }
+}
+```
+
+Then try **Reject a moving version alias**. Its expected outcome is `rejected`; identify the condition or evidence field that explains the difference.
 
 ## Validation
 
