@@ -1,0 +1,29 @@
+{
+  "source": "live-provider-commentary",
+  "sessionId": "sesn_01URKR55sqGveVvBoMGDkhzx",
+  "answer": "This local experiment demonstrates separating three categories of skill evidence: authored files (with hashed content), configured skill metadata (a resolved canonical version), and observed runtime behavior (file reads). It verifies that a skill's existence can be confirmed through file hashes and version matching without conflating that with permissions being granted or remote integration. The \"passed\" outcome means all three evidence types were successfully kept distinct during the demonstration.",
+  "stopReason": "end_turn",
+  "eventTypes": [
+    "session.status_running",
+    "session.thread_status_running",
+    "user.message",
+    "span.model_request_start",
+    "agent.thinking",
+    "agent.message",
+    "span.model_request_end",
+    "session.thread_status_idle",
+    "session.usage",
+    "session.status_idle"
+  ],
+  "requestUsage": [
+    {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 688,
+      "output_tokens": 119,
+      "speed": "standard"
+    }
+  ],
+  "experimentHash": "fe8f92289101bc97c473b7ae3ed7cd7da00f50b3346f66d4bc16dace8cf842c8",
+  "scope": "A real text-only model response about the local experiment. External integrations and the experiment's correctness are not certified by this response."
+}

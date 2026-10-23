@@ -1,0 +1,49 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { createHash } from "node:crypto";
+import type { BetaManagedAgentsSessionEvent as Event } from "@anthropic-ai/sdk/resources/beta/sessions/events";
+export function pinnedSkillAgent(modelId: string, skillId: string, canonicalVersion: string) {
+  if (!skillId.startsWith("skill_") || !canonicalVersion.startsWith("skver_")) throw new Error("Canonical uploaded skill and version IDs required");
+  return { name: "Observation Formatter", model: modelId, system: "Format field observations. Consult the attached formatting skill.",
+    skills: [{ type: "custom" as const, skill_id: skillId, version: canonicalVersion }],
+    tools: [{ type: "agent_toolset_20260401" as const, default_config: { enabled: false },
+      configs: [{ name: "read" as const, enabled: true }] }], mcp_servers: [], multiagent: null };
+}
+export async function createFormatter(client: Anthropic, modelId: string, skillId: string, canonicalVersion: string) {
+  return client.beta.agents.create(pinnedSkillAgent(modelId, skillId, canonicalVersion), { maxRetries: 0, timeout: 10000 });
+}
+type SkillRef = { type: string; skill_id: string; version: string };
+export async function verifyResolvedSkill(resolved: readonly SkillRef[], expected: { skillId: string; version: string },
+  resolveAlias: (skillId: string, alias: string) => Promise<string>) {
+  if (!expected.version.startsWith("skver_")) throw new Error("Canonical expected version required");
+  if (resolved.length !== 1 || resolved[0].type !== "custom" || resolved[0].skill_id !== expected.skillId || resolved[0].version === "latest")
+    throw new Error("Unexpected resolved skills");
+  const actual = resolved[0].version === expected.version ? expected.version : await resolveAlias(expected.skillId, resolved[0].version);
+  if (actual !== expected.version) throw new Error("Skill version mismatch");
+  return { skillId: expected.skillId, canonicalVersion: actual };
+}
+export function authoredManifest(files: Readonly<Record<string,string>>) {
+  return Object.entries(files).map(([path,text]) => ({ path, sha256: createHash("sha256").update(text,"utf8").digest("hex") }));
+}
+export function makeReadEvidence(approvedPaths: ReadonlyMap<string,"instructions" | "reference">) {
+  const calls = new Map<string,{path:string;kind:"instructions" | "reference"}>();
+  const completed = new Set<string>();
+  const reads: {callId:string;resultId:string;path:string;kind:"instructions" | "reference"}[] = [];
+  return { reads, ingest(event: Event) {
+    if (event.type === "agent.tool_use" && event.name === "read" && event.evaluated_permission !== "deny") {
+      if (typeof event.input.path === "string" && typeof event.input.file_path === "string" && event.input.path !== event.input.file_path) return;
+      const path = typeof event.input.file_path === "string" ? event.input.file_path : event.input.path;
+      if (typeof path === "string") { const kind = approvedPaths.get(path); if (kind) calls.set(event.id,{path,kind}); }
+    }
+    if (event.type !== "agent.tool_result" || event.is_error !== false || completed.has(event.tool_use_id)) return;
+    const call = calls.get(event.tool_use_id);
+    if (!call || !event.content?.some(block => block.type === "text" && block.text.length > 0)) return;
+    reads.push({callId:event.tool_use_id,resultId:event.id,...call}); completed.add(event.tool_use_id);
+  } };
+}
+// Canonical skver_ policy follows the course upload record. "latest" and arbitrary aliases are not pins.
+// Resolve any reported alias through a read-only lookup scoped to the exact skill ID.
+// Manifest hashes supplied UTF-8 text, not evidence that a file was read from disk or uploaded.
+// Approved paths come from trusted resolved bundle information, not a model claim or basename match.
+// Successful correlated text reads show observed loading, not full-file completeness or compliance.
+// Missing/failed/unmatched read evidence stays unavailable. Reconcile history before concluding no load.
+// Read-only tool capability permits text responses; this example cannot build a DOCX/PPTX artifact.

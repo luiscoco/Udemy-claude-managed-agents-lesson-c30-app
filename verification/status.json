@@ -1,0 +1,13 @@
+{
+  "lesson": "C30",
+  "title": "Skills and Progressive Loading",
+  "path": "lesson-c30\\lesson-c30-app",
+  "port": 3030,
+  "scenarios": 2,
+  "state": "implemented and verified",
+  "liveScope": "text-only commentary about the local result",
+  "typecheck": true,
+  "localTests": true,
+  "browserSmoke": "passed: desktop, mobile, scenario controls, source view",
+  "liveCommentarySmoke": "passed: real text-only session reached end_turn"
+}
